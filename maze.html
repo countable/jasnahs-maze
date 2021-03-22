@@ -1,0 +1,187 @@
+
+<!doctype html>
+<html>
+<head>
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+<script
+			  src="https://code.jquery.com/jquery-3.5.1.js"
+			  crossorigin="anonymous"></script>
+</head>
+
+
+<body>
+
+<style>
+body {
+    width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+}
+* {
+box-sizing: border-box
+}
+table {
+	border: 1px solid black;
+}
+td {
+	position: relative;
+	padding: 0;
+	margin: 0;
+}
+.in-maze {
+	/*background:
+	linear-gradient(135deg, #ddd 21px, #eee 22px, #eee 24px, transparent 24px, transparent 67px, #eee 67px, #eee 69px, transparent 69px),
+	linear-gradient(225deg, #ddd 21px, #eee 22px, #eee 24px, transparent 24px, transparent 67px, #eee 67px, #eee 69px, transparent 69px)0 64px;
+	background-color:#ddd;
+	background-size: 64px 128px;*/
+}
+
+.ra-gold-bar {
+	color: yellow;
+}
+.ra-fire {
+	color: red;
+}
+.ra-gem {
+	color: lightblue;
+}
+.ra-fox {
+    color: orange;
+}
+.ra-sword {
+	color: pink;
+}
+.ra-vest {
+	color: pink;
+}
+.ra-apple {
+	color: red;
+}
+.ra-cheese {
+	color: yellow;
+}
+.ra-carrot {
+	color: orange;
+}
+.ra-snake {
+	color: green;
+}
+.ra-dripping-sword {
+	color: lightblue;
+}
+
+td::before {
+	position: absolute;
+}
+
+.infobar {
+	height: 10min;
+	border: 1px solid black;
+}
+.infobar div {
+	height: 10vmin;
+	width: 10vmin;
+	position: relative;
+	border: 1px solid black;
+	font-size: 5vmin;
+	float:left;
+	box-sizing: border-box;
+	padding-top: 3vmin;
+	background-color: #ddd;
+}
+.infobar div:before {
+	position: absolute;
+	top: 0;
+}
+.infobar::after {
+	content: '';
+	display: block;
+	clear: both;
+}
+.weapon, .armor {
+  position: absolute;
+
+  width: 5vmax;
+  height: 5vmax;
+  font-size: 3vmax;
+  display: none;
+}
+.weapon {
+  right: 0;
+  top: 2.5vmax;
+}
+.armor {
+  left: 2.5vmax;
+  top: 3.6vmax;
+}
+.ra-player .weapon {
+	display: block
+}
+.ra-player .armor {
+	display: block
+}
+
+.border-top-wall {
+	border-top: 1px solid black;
+}
+.border-bottom-wall {
+	border-bottom: 1px solid black;
+}
+
+.border-left-wall {
+	border-left: 1px solid black;
+}
+.border-right-wall {
+	border-right: 1px solid black;
+}
+.cost-1::after {
+	content: '1';
+}
+.cost-2::after {
+	content: '2';
+}
+.cost-3::after {
+	content: '3';
+}
+.cost-4::after {
+	content: '4';
+}
+.cost-5::after {
+	content: '5';
+}
+.cost-1::after, .cost-2::after, .cost-3::after, .cost-4::after, .cost-5::after {
+	position: absolute;
+	color: black;
+	font-size: 2vmax;
+	background: yellow;
+	border-radius: 50%;
+	width: 3vmax;
+	height: 3vmax;
+	box-shadow: .5vmax .5vmax .5vmax rgba(0,0,0,0.5);
+	text-align: center;
+}
+
+
+</style>
+<link rel="stylesheet" href="rpg-awesome/css/rpg-awesome.css">
+
+<div class="infobar">
+	<div class="ra gold-bar ra-gold-bar"></div>
+	<div class="ra hearts ra-hearts"></div>
+	<div class="ra weapon"></div>
+	<div class="ra armor"></div>
+	<div class="ra pet"></div>
+</div>
+<table cellpadding=0 cellspacing=0>
+
+</table>
+
+<script src="entities.js"></script>
+<script src="tiles.js"></script>
+<script src="maze.js"></script>
+
+</body>
+</html>
