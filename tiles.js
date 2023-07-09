@@ -1,6 +1,7 @@
 
 var Tiles = new EntityTree();
 
+
 Tiles.add([
 	{
 		name: 'tile',
@@ -36,6 +37,7 @@ Tiles.add([
 		parent: 'effect',
 		collect: function() {
 			hearts = Math.min(max_hearts, hearts + 1);
+			mmm.play()
 		}
 	},
 	{
@@ -43,6 +45,7 @@ Tiles.add([
 		parent: 'effect',
 		collect: function() {
 			hearts = Math.min(max_hearts, hearts + 3);
+			mmm.play()
 		}
 	},
 	{
@@ -50,13 +53,14 @@ Tiles.add([
 		parent: 'effect',
 		collect: function() {
 			hearts = Math.min(max_hearts, hearts + 2);
+			mmm.play()
 		}
 	},
 	{	
 		name: 'fire',
 		collect: function() {
 			if (pet !== 'ra-gem') {
-				hearts --;
+				hurt(1)
 			}
 		},
 		parent: 'effect'
@@ -65,6 +69,7 @@ Tiles.add([
 		name: 'heart-bottle',
 		collect: function() {
 			max_hearts ++;
+			mmm.play()
 		},
 		parent: 'effect'
 	},
@@ -127,14 +132,48 @@ Tiles.add([
 		name: 'enemy',
 		speed: 10,
 		touch: function(board) {
-			if (!armor) {
-				hearts -= this.damage;
-			}
+
 			if (weapon) {
 				$dest.clear()
 				if ($('.ra-fox').length === 0) {
 					addTile('ra-shoe-prints')
 				}
+			}
+			board.block()
+		},
+		tick: function($el) {
+
+			if (Math.random() > this.speed/10) return;
+			var options = [];
+			var player_here = null;
+			const addOpt = ($opt) => {
+				if ($opt.isEmpty()) {
+					options.push($opt)
+				}
+				if ($opt.hasClass('ra-player')) {
+					player_here=$opt
+				}
+			}
+			if (!$el.hasClass('border-top-wall')) {
+				addOpt($el.up())
+			}
+			if (!$el.hasClass('border-bottom-wall')) {
+				addOpt($el.down())
+			}
+			if (!$el.hasClass('border-left-wall')) {
+				addOpt($el.left())
+			}
+			if (!$el.hasClass('border-right-wall')) {
+				addOpt($el.right())
+			}
+			
+			if (player_here) {
+				hurt(this.damage)
+			} else if (options.length) {
+				$dest = options[Math.floor(Math.random()*options.length)]
+				cls = $el.getGameClasses()
+				cls.forEach((c) => {$dest.addClass(c)})
+				$el.clear()
 			}
 		},
 		parent: 'tile'

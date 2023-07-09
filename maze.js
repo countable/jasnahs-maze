@@ -93,7 +93,7 @@ function init() {
 	addTile('ra-player')
 	//addTile('ra-shoe-prints')
 	/*addTile('ra-gold-bar')
-	addTile('ra-gold-bar')
+	addTile('ra-gold-bar')*/
 	addTile('ra-gold-bar')
 	addTile('ra-fire')
 	addTile('ra-fire')
@@ -102,16 +102,21 @@ function init() {
 	addTile('ra-heart-bottle')
 	addTile('ra-apple')
 	addTile('ra-carrot')
+	addTile('ra-carrot')
+	addTile('ra-carrot')
+	addTile('ra-carrot')
+	addTile('ra-carrot')
+	addTile('ra-carrot')
 	addTile('ra-cheese')
-	addTile('ra-gem')
+	/*addTile('ra-gem')
 	addTile('ra-fox')
 	addTile('ra-fox')*/
 	addTile('ra-fox')
 	addTile('ra-snake')
 	addTile('ra-cat')
-	/*addTile('ra-vest').addClass('cost-1')
+	/*addTile('ra-vest').addClass('cost-1')*/
 	addTile('ra-sword').addClass('cost-1')
-	addTile('ra-dripping-sword').addClass('cost-3')*/
+	/*addTile('ra-dripping-sword').addClass('cost-3')*/
 
 	/*addTile('cost-3 sword')*/
 	infobar_update()
@@ -133,35 +138,6 @@ function addTile(cls) {
 	return $td;
 }
 
-function moveRandomly($el) {
-	Tile = Tiles.get($el.getTileName())
-	if (Math.random() > Tile.speed/10) return;
-	var options = [];
-	const addOpt = ($opt) => {
-		if ($opt.isEmpty()) {
-			options.push($opt)
-		}
-	}
-	if (!$el.hasClass('border-top-wall')) {
-		addOpt($el.up())
-	}
-	if (!$el.hasClass('border-bottom-wall')) {
-		addOpt($el.down())
-	}
-	if (!$el.hasClass('border-left-wall')) {
-		addOpt($el.left())
-	}
-	if (!$el.hasClass('border-right-wall')) {
-		addOpt($el.right())
-	}
-	
-	if (options.length) {
-		$dest = options[Math.floor(Math.random()*options.length)]
-		cls = $el.getGameClasses()
-		cls.forEach((c) => {$dest.addClass(c)})
-		$el.clear()
-	}
-}
 
 $.fn.getTileName = function() {
 	const cls = $(this).attr('class').split(' ').filter((t) => {
@@ -189,6 +165,11 @@ function moveTo($src, $dest) {
 			$dest.clear()
 			$dest.addClass('ra-player')
 			oldClasses.forEach((c) => {$src.addClass(c)})
+		},
+		block: function() {
+			const $tmp = $src
+			$dest = $tmp
+			$src = $dest
 		}
 	}
 	
@@ -203,12 +184,16 @@ function moveTo($src, $dest) {
 		
 		board.clear()
 	}
-	infobar_update();
+
+	if (hearts < 1) {
+		console.log('died', $dest)
+	  $dest.removeClass('ra-player').addClass('ra-falling')
+	}
 	
-	moveRandomly($('.ra-snake').eq(0))
-	moveRandomly($('.ra-fox').eq(0))
-	//moveRandomly($('.ra-fox').eq(1))
-	//moveRandomly($('.ra-fox').eq(2))
+	$('td').each(function(){
+		const tile = Tiles.get($(this).getTileName())
+		tile && tile.tick && tile.tick($(this))
+	})
 	
 	// update pet.
 	if (pet && $src.isEmpty()) {
@@ -216,7 +201,10 @@ function moveTo($src, $dest) {
 		$src.addClass(pet)
 	}
 	
+	infobar_update();
+
 	if (hearts < 1) {
+		console.log(hearts)
 	  $dest.removeClass('ra-player').addClass('ra-falling')
 	}
 	
@@ -249,7 +237,9 @@ $.fn.clear = function() {
 	});
 }
 
-$(document).keyup(function(e){
+$(function(){
+document.addEventListener('keydown',function(e){
+	 
 	$m = $('.ra-player')
 	if (e.key === 'ArrowUp') {
 		$dest = $m.up()
@@ -275,6 +265,16 @@ $(document).keyup(function(e){
 			moveTo($m, $dest)
 		}
 	}
+
+
+},true)
+
+$(document).one('click', init)
 })
 
-init()
+const ouch = new Audio('ouch.mp3')
+const mmm = new Audio('mmm.mp3')
+const hurt = function(n){
+	hearts -= n
+	ouch.play()
+}
