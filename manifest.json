@@ -2,7 +2,7 @@
     "name": "Accelerometer Maze",
     "short_name": "Maze",
     "start_url": ".",
-    "display": "fullscreen",
+    "display": "standalone",
     "orientation": "portrait",
     "background_color": "#1a1a2e",
     "theme_color": "#1a1a2e"
