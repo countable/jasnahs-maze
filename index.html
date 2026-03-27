@@ -95,6 +95,10 @@
     <div id="start-screen" class="overlay" style="display:flex;">
         <h1>Maze Runner</h1>
         <p>Tilt your phone or use arrow keys to guide the ball through increasingly dangerous mazes!</p>
+        <div id="install-tip" style="display:none; background:#334155; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:0.9rem; max-width:300px; text-align:center; line-height:1.5;">
+            For fullscreen mode: tap <strong>Share</strong> <span style="font-size:1.2em;">⬆</span> then <strong>Add to Home Screen</strong>
+            <br><button onclick="this.parentElement.style.display='none'; localStorage.setItem('installDismissed','1');" style="margin-top:8px; padding:4px 16px; border:none; border-radius:4px; background:#475569; color:#e0e0e0; font-size:0.85rem; cursor:pointer;">Got it</button>
+        </div>
         <button class="btn-red" id="start-btn">Tap to Start</button>
         <button class="btn-update" id="update-btn">Check for Updates</button>
     </div>
@@ -706,6 +710,13 @@
         requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
+
+    // --- INSTALL TIP (iOS Safari only, not already standalone) ---
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.navigator.standalone === true;
+    if (isIos && !isStandalone && !localStorage.getItem('installDismissed')) {
+        document.getElementById('install-tip').style.display = 'block';
+    }
 
     // --- UPDATE BUTTON ---
     document.getElementById('update-btn').addEventListener('click', async () => {
