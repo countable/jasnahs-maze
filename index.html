@@ -51,6 +51,10 @@
     </style>
 </head>
 <body>
+    <div id="start-btn" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:20; align-items:center; justify-content:center; flex-direction:column;">
+        <h2 style="color:#e0e0e0; margin-bottom:20px;">Accelerometer Maze</h2>
+        <button style="padding:16px 40px; font-size:1.3rem; border:none; border-radius:8px; background:#f87171; color:#fff; cursor:pointer;">Tap to Start</button>
+    </div>
     <canvas id="maze"></canvas>
     <div id="status">Tilt your phone to move the ball</div>
     <div id="win">
@@ -101,38 +105,19 @@
     let won = false;
     let hasAccelerometer = false;
 
-    // Request accelerometer permission (iOS 13+)
-    function requestPermission() {
-        if (typeof DeviceOrientationEvent !== 'undefined' &&
-            typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission()
-                .then(response => {
-                    if (response === 'granted') {
-                        listenOrientation();
-                    } else {
-                        statusEl.textContent = 'Permission denied. Use arrow keys instead.';
-                    }
-                })
-                .catch(() => {
-                    statusEl.textContent = 'Permission error. Use arrow keys instead.';
-                });
-        } else {
-            listenOrientation();
-        }
-    }
+    const startBtn = document.getElementById('start-btn');
+    const needsPermission = typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function';
 
     function listenOrientation() {
         window.addEventListener('deviceorientation', (e) => {
             if (e.gamma !== null && e.beta !== null) {
                 hasAccelerometer = true;
-                // gamma: left/right tilt (-90 to 90)
-                // beta: front/back tilt (-180 to 180)
-                tiltX = e.gamma; // positive = tilt right
-                tiltY = e.beta;  // positive = tilt forward
+                tiltX = e.gamma;
+                tiltY = e.beta;
                 statusEl.textContent = `Tilt: ${tiltX.toFixed(1)}, ${tiltY.toFixed(1)}`;
             }
         });
-        // If no events after 1s, show keyboard hint
         setTimeout(() => {
             if (!hasAccelerometer) {
                 statusEl.textContent = 'No accelerometer detected. Use arrow keys.';
@@ -145,12 +130,27 @@
     window.addEventListener('keydown', e => { keys[e.key] = true; });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
 
-    // Tap to request permission on iOS
-    document.body.addEventListener('click', () => {
-        if (!hasAccelerometer) requestPermission();
-    }, { once: true });
-
-    requestPermission();
+    if (needsPermission) {
+        // iOS requires permission request inside a user gesture handler
+        startBtn.style.display = 'flex';
+        startBtn.querySelector('button').addEventListener('click', () => {
+            DeviceOrientationEvent.requestPermission()
+                .then(response => {
+                    startBtn.style.display = 'none';
+                    if (response === 'granted') {
+                        listenOrientation();
+                    } else {
+                        statusEl.textContent = 'Permission denied. Use arrow keys.';
+                    }
+                })
+                .catch(() => {
+                    startBtn.style.display = 'none';
+                    statusEl.textContent = 'Permission error. Use arrow keys.';
+                });
+        });
+    } else {
+        listenOrientation();
+    }
 
     function isWall(gx, gy) {
         if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) return true;
