@@ -102,13 +102,10 @@
     let ball = { x: 1.5, y: 1.5, vx: 0, vy: 0 };
     const radius = 0.35;
 
-    // Physics scaled for ~6" diagonal phone (~11 cells across ~2.7 inches)
-    // Real gravity: 9.8 m/s² ≈ 386 in/s². Each cell ≈ 0.25 in.
-    // At 45° tilt (gamma=45), we want ~gravity * sin(45°) in cell-units/s²
-    // 386 * 0.707 / 0.25 ≈ 1092 cells/s², divide by 60fps² → ~0.3 per frame²
-    // tilt is in degrees, so per-degree: 0.3/45 ≈ 0.007
-    const accelScale = 0.006;
-    const friction = 0.97;
+    // Physics: tuned so full tilt feels brisk but ball can't skip walls
+    const accelScale = 0.002;
+    const friction = 0.95;
+    const maxSpeed = 0.25; // cells per frame — must be < radius to prevent tunneling
     let tiltX = 0, tiltY = 0;
     let won = false;
     let hasAccelerometer = false;
@@ -190,23 +187,33 @@
             ax = tiltX * accelScale;
             ay = tiltY * accelScale;
         }
-        if (keys['ArrowLeft'])  ax = -0.15;
-        if (keys['ArrowRight']) ax = 0.15;
-        if (keys['ArrowUp'])    ay = -0.15;
-        if (keys['ArrowDown'])  ay = 0.15;
+        if (keys['ArrowLeft'])  ax = -0.05;
+        if (keys['ArrowRight']) ax = 0.05;
+        if (keys['ArrowUp'])    ay = -0.05;
+        if (keys['ArrowDown'])  ay = 0.05;
 
         ball.vx += ax;
         ball.vy += ay;
         ball.vx *= friction;
         ball.vy *= friction;
 
-        // Move and collide X
-        ball.x += ball.vx;
-        resolveCollision('x');
+        // Clamp speed so ball can never move more than radius per step
+        const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+        if (speed > maxSpeed) {
+            ball.vx = (ball.vx / speed) * maxSpeed;
+            ball.vy = (ball.vy / speed) * maxSpeed;
+        }
 
-        // Move and collide Y
-        ball.y += ball.vy;
-        resolveCollision('y');
+        // Sub-step movement to prevent tunneling through walls
+        const steps = Math.ceil(Math.max(Math.abs(ball.vx), Math.abs(ball.vy)) / (radius * 0.5)) || 1;
+        const svx = ball.vx / steps;
+        const svy = ball.vy / steps;
+        for (let i = 0; i < steps; i++) {
+            ball.x += svx;
+            resolveCollision('x');
+            ball.y += svy;
+            resolveCollision('y');
+        }
 
         // Check goal
         const gx = Math.floor(ball.x);
@@ -242,11 +249,13 @@
             const dy = ball.y - closestY;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (dist < r) {
-                if (dist === 0) continue;
+            if (dist < r && dist > 0) {
                 const overlap = r - dist;
-                ball.x += (dx / dist) * overlap;
-                ball.y += (dy / dist) * overlap;
+                const nx = dx / dist;
+                const ny = dy / dist;
+                ball.x += nx * overlap;
+                ball.y += ny * overlap;
+                // Zero velocity into the wall
                 if (axis === 'x') ball.vx = 0;
                 if (axis === 'y') ball.vy = 0;
             }
