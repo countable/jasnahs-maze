@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="screen-orientation" content="portrait">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
     <title>Accelerometer Maze</title>
     <style>
@@ -166,9 +169,11 @@
     lockOrientation();
 
     function goFullscreen() {
-        const el = document.documentElement;
+        // On iOS Safari, fullscreen only works on specific elements (canvas, video)
+        const el = canvas;
         if (el.requestFullscreen) el.requestFullscreen().then(lockOrientation).catch(() => {});
         else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     }
 
     // Always show start button so fullscreen is triggered from a user gesture
