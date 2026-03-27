@@ -102,31 +102,20 @@
             border: none; border-radius: 8px;
             cursor: pointer; margin-top: 16px;
         }
-        #rotate-msg {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: #1a1a2e;
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            color: #e0e0e0;
-            font-size: 1.3rem;
-            text-align: center;
-            padding: 20px;
-        }
-        #rotate-msg .icon { font-size: 4rem; margin-bottom: 16px; }
+        /* Force portrait layout when device is in landscape */
         @media (orientation: landscape) {
-            #rotate-msg { display: flex !important; }
+            html {
+                position: fixed;
+                width: 100vh;
+                height: 100vw;
+                transform: rotate(-90deg) translateX(-100%);
+                transform-origin: top left;
+                overflow: hidden;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="rotate-msg">
-        <div class="icon">📱</div>
-        <div>Please rotate your device to portrait mode</div>
-    </div>
 
     <div id="start-screen" class="overlay" style="display:flex;">
         <h1>Maze Runner</h1>
@@ -746,6 +735,9 @@
 
     // --- GAME LOOP ---
     window.addEventListener('resize', () => { if (gameStarted) { sizeCanvas(); draw(); } });
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => { if (gameStarted) { sizeCanvas(); draw(); } }, 100);
+    });
 
     function loop() {
         update();
