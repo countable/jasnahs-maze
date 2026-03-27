@@ -159,6 +159,16 @@
     const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
 
+    // --- PWA DEBUG ---
+    const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    statusEl.textContent = `PWA: ${isStandalone ? 'standalone' : 'browser'} | SW: pending`;
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(reg => {
+            const swStatus = reg ? (reg.active ? 'active' : 'registered') : 'none';
+            statusEl.textContent = `PWA: ${isStandalone ? 'standalone' : 'browser'} | SW: ${swStatus}`;
+        });
+    }
+
     // --- TILE TYPES ---
     // 0=path, 1=wall, 2=goal, 3=trap(spikes), 4=key, 5=door, 6=monster-spawn
     const TILE = { PATH:0, WALL:1, GOAL:2, TRAP:3, KEY:4, DOOR:5, MONSTER:6 };
