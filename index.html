@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="screen-orientation" content="portrait">
+    <link rel="manifest" href="manifest.json">
     <title>Accelerometer Maze</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -130,10 +132,23 @@
     window.addEventListener('keydown', e => { keys[e.key] = true; });
     window.addEventListener('keyup', e => { keys[e.key] = false; });
 
+    // Lock to portrait when possible
+    function lockOrientation() {
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('portrait').catch(() => {});
+        }
+    }
+    lockOrientation();
+
     if (needsPermission) {
         // iOS requires permission request inside a user gesture handler
         startBtn.style.display = 'flex';
         startBtn.querySelector('button').addEventListener('click', () => {
+            // Go fullscreen to enable orientation lock
+            const el = document.documentElement;
+            if (el.requestFullscreen) el.requestFullscreen().then(lockOrientation).catch(() => {});
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+
             DeviceOrientationEvent.requestPermission()
                 .then(response => {
                     startBtn.style.display = 'none';
