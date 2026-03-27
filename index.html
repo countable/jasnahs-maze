@@ -102,17 +102,6 @@
             border: none; border-radius: 8px;
             cursor: pointer; margin-top: 16px;
         }
-        /* Force portrait layout when device is in landscape */
-        @media (orientation: landscape) {
-            html {
-                position: fixed;
-                width: 100vh;
-                height: 100vw;
-                transform: rotate(-90deg) translateX(-100%);
-                transform-origin: top left;
-                overflow: hidden;
-            }
-        }
     </style>
 </head>
 <body>
