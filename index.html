@@ -29,10 +29,46 @@
             top: 8px; left: 8px; right: 8px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 14px;
             color: #ccc;
             z-index: 5;
             pointer-events: none;
+        }
+        #kebab-wrap {
+            position: relative;
+            pointer-events: auto;
+        }
+        #kebab-btn {
+            background: none; border: none; color: #ccc;
+            font-size: 22px; cursor: pointer; padding: 4px 8px;
+            line-height: 1;
+        }
+        #kebab-menu {
+            display: none;
+            position: absolute;
+            top: 100%; right: 0;
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            min-width: 160px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 50;
+            overflow: hidden;
+        }
+        #kebab-menu.open { display: block; }
+        #kebab-menu button {
+            display: block; width: 100%;
+            background: none; border: none;
+            color: #e0e0e0; text-align: left;
+            padding: 10px 14px; font-size: 14px;
+            cursor: pointer;
+        }
+        #kebab-menu button:hover { background: #334155; }
+        #kebab-menu .menu-label {
+            padding: 8px 14px 4px;
+            font-size: 11px; color: #888;
+            text-transform: uppercase; letter-spacing: 0.5px;
         }
         #status { margin-top: 8px; font-size: 13px; color: #888; }
         .overlay {
@@ -128,6 +164,13 @@
     <div id="hud">
         <span id="hud-level"></span>
         <span id="hud-keys"></span>
+        <div id="kebab-wrap">
+            <button id="kebab-btn">&#8942;</button>
+            <div id="kebab-menu">
+                <div class="menu-label">Jump to Level</div>
+                <div id="level-list"></div>
+            </div>
+        </div>
     </div>
 
     <canvas id="maze"></canvas>
@@ -710,6 +753,37 @@
         requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
+
+    // --- KEBAB MENU / LEVEL SELECTOR ---
+    const kebabBtn = document.getElementById('kebab-btn');
+    const kebabMenu = document.getElementById('kebab-menu');
+    const levelList = document.getElementById('level-list');
+
+    // Populate level list
+    levels.forEach((lv, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = lv.name;
+        btn.addEventListener('click', () => {
+            kebabMenu.classList.remove('open');
+            currentLevel = i;
+            loadLevel(i);
+            showScreen(null);
+        });
+        levelList.appendChild(btn);
+    });
+
+    kebabBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        kebabMenu.classList.toggle('open');
+    });
+
+    document.addEventListener('click', () => {
+        kebabMenu.classList.remove('open');
+    });
+
+    kebabMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
 
     // --- INSTALL TIP (iOS Safari only, not already standalone) ---
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
