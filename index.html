@@ -60,6 +60,12 @@
         }
         .btn-green { background: #4ade80; color: #1a1a2e; }
         .btn-red { background: #f87171; color: #fff; }
+        .btn-update {
+            background: #fbbf24; color: #1a1a2e;
+            padding: 10px 24px; font-size: 0.9rem;
+            border: none; border-radius: 8px;
+            cursor: pointer; margin-top: 16px;
+        }
         #rotate-msg {
             display: none;
             position: fixed;
@@ -90,6 +96,7 @@
         <h1>Maze Runner</h1>
         <p>Tilt your phone or use arrow keys to guide the ball through increasingly dangerous mazes!</p>
         <button class="btn-red" id="start-btn">Tap to Start</button>
+        <button class="btn-update" id="update-btn" style="display:none;">Update Available — Tap to Reload</button>
     </div>
 
     <div id="level-screen" class="overlay">
@@ -699,6 +706,37 @@
         requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
+
+    // --- SERVICE WORKER & UPDATE ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            // Check for updates every 30 seconds
+            setInterval(() => reg.update(), 30000);
+
+            function onNewWorker(worker) {
+                const btn = document.getElementById('update-btn');
+                btn.style.display = 'block';
+                btn.addEventListener('click', () => {
+                    worker.postMessage('skipWaiting');
+                });
+            }
+
+            if (reg.waiting) onNewWorker(reg.waiting);
+
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        onNewWorker(newWorker);
+                    }
+                });
+            });
+        });
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+        });
+    }
     </script>
 </body>
 </html>
