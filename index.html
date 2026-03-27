@@ -53,7 +53,7 @@
     </style>
 </head>
 <body>
-    <div id="start-btn" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:20; align-items:center; justify-content:center; flex-direction:column;">
+    <div id="start-btn" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:20; display:flex; align-items:center; justify-content:center; flex-direction:column;">
         <h2 style="color:#e0e0e0; margin-bottom:20px;">Accelerometer Maze</h2>
         <button style="padding:16px 40px; font-size:1.3rem; border:none; border-radius:8px; background:#f87171; color:#fff; cursor:pointer;">Tap to Start</button>
     </div>
@@ -140,15 +140,17 @@
     }
     lockOrientation();
 
-    if (needsPermission) {
-        // iOS requires permission request inside a user gesture handler
-        startBtn.style.display = 'flex';
-        startBtn.querySelector('button').addEventListener('click', () => {
-            // Go fullscreen to enable orientation lock
-            const el = document.documentElement;
-            if (el.requestFullscreen) el.requestFullscreen().then(lockOrientation).catch(() => {});
-            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    function goFullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen().then(lockOrientation).catch(() => {});
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    }
 
+    // Always show start button so fullscreen is triggered from a user gesture
+    startBtn.querySelector('button').addEventListener('click', () => {
+        goFullscreen();
+
+        if (needsPermission) {
             DeviceOrientationEvent.requestPermission()
                 .then(response => {
                     startBtn.style.display = 'none';
@@ -162,10 +164,11 @@
                     startBtn.style.display = 'none';
                     statusEl.textContent = 'Permission error. Use arrow keys.';
                 });
-        });
-    } else {
-        listenOrientation();
-    }
+        } else {
+            startBtn.style.display = 'none';
+            listenOrientation();
+        }
+    });
 
     function isWall(gx, gy) {
         if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) return true;
