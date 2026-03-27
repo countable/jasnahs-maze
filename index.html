@@ -101,8 +101,14 @@
     // Ball state
     let ball = { x: 1.5, y: 1.5, vx: 0, vy: 0 };
     const radius = 0.35;
-    const friction = 0.92;
-    const accelScale = 0.0004;
+
+    // Physics scaled for ~6" diagonal phone (~11 cells across ~2.7 inches)
+    // Real gravity: 9.8 m/s² ≈ 386 in/s². Each cell ≈ 0.25 in.
+    // At 45° tilt (gamma=45), we want ~gravity * sin(45°) in cell-units/s²
+    // 386 * 0.707 / 0.25 ≈ 1092 cells/s², divide by 60fps² → ~0.3 per frame²
+    // tilt is in degrees, so per-degree: 0.3/45 ≈ 0.007
+    const accelScale = 0.006;
+    const friction = 0.97;
     let tiltX = 0, tiltY = 0;
     let won = false;
     let hasAccelerometer = false;
@@ -184,10 +190,10 @@
             ax = tiltX * accelScale;
             ay = tiltY * accelScale;
         }
-        if (keys['ArrowLeft'])  ax = -0.015;
-        if (keys['ArrowRight']) ax = 0.015;
-        if (keys['ArrowUp'])    ay = -0.015;
-        if (keys['ArrowDown'])  ay = 0.015;
+        if (keys['ArrowLeft'])  ax = -0.15;
+        if (keys['ArrowRight']) ax = 0.15;
+        if (keys['ArrowUp'])    ay = -0.15;
+        if (keys['ArrowDown'])  ay = 0.15;
 
         ball.vx += ax;
         ball.vy += ay;
