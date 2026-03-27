@@ -2,25 +2,281 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World - Jasnah's Maze</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Accelerometer Maze</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
             background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: sans-serif;
             color: #e0e0e0;
+            overflow: hidden;
+            touch-action: none;
         }
-        h1 {
-            font-size: 3rem;
+        canvas {
+            border: 2px solid #444;
+            border-radius: 4px;
+        }
+        #status {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #888;
+        }
+        #win {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 10;
+        }
+        #win h1 { font-size: 3rem; color: #4ade80; }
+        #win button {
+            margin-top: 20px;
+            padding: 12px 32px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 8px;
+            background: #4ade80;
+            color: #1a1a2e;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <h1>Hello World!</h1>
+    <canvas id="maze"></canvas>
+    <div id="status">Tilt your phone to move the ball</div>
+    <div id="win">
+        <h1>You Win!</h1>
+        <button onclick="resetGame()">Play Again</button>
+    </div>
+
+    <script>
+    const canvas = document.getElementById('maze');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const winEl = document.getElementById('win');
+
+    // Maze grid (1 = wall, 0 = path, 2 = goal)
+    const grid = [
+        [1,1,1,1,1,1,1,1,1,1,1],
+        [1,0,0,0,1,0,0,0,0,0,1],
+        [1,0,1,0,1,0,1,1,1,0,1],
+        [1,0,1,0,0,0,0,0,1,0,1],
+        [1,0,1,1,1,1,1,0,1,0,1],
+        [1,0,0,0,0,0,1,0,0,0,1],
+        [1,1,1,0,1,0,1,1,1,0,1],
+        [1,0,0,0,1,0,0,0,0,0,1],
+        [1,0,1,1,1,1,1,1,1,0,1],
+        [1,0,0,0,0,0,0,0,0,2,1],
+        [1,1,1,1,1,1,1,1,1,1,1],
+    ];
+
+    const rows = grid.length;
+    const cols = grid[0].length;
+    let cellSize;
+
+    function sizeCanvas() {
+        const maxDim = Math.min(window.innerWidth - 20, window.innerHeight - 80, 500);
+        cellSize = Math.floor(maxDim / cols);
+        canvas.width = cols * cellSize;
+        canvas.height = rows * cellSize;
+    }
+    sizeCanvas();
+    window.addEventListener('resize', () => { sizeCanvas(); draw(); });
+
+    // Ball state
+    let ball = { x: 1.5, y: 1.5, vx: 0, vy: 0 };
+    const radius = 0.35;
+    const friction = 0.92;
+    const accelScale = 0.0004;
+    let tiltX = 0, tiltY = 0;
+    let won = false;
+    let hasAccelerometer = false;
+
+    // Request accelerometer permission (iOS 13+)
+    function requestPermission() {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(response => {
+                    if (response === 'granted') {
+                        listenOrientation();
+                    } else {
+                        statusEl.textContent = 'Permission denied. Use arrow keys instead.';
+                    }
+                })
+                .catch(() => {
+                    statusEl.textContent = 'Permission error. Use arrow keys instead.';
+                });
+        } else {
+            listenOrientation();
+        }
+    }
+
+    function listenOrientation() {
+        window.addEventListener('deviceorientation', (e) => {
+            if (e.gamma !== null && e.beta !== null) {
+                hasAccelerometer = true;
+                // gamma: left/right tilt (-90 to 90)
+                // beta: front/back tilt (-180 to 180)
+                tiltX = e.gamma; // positive = tilt right
+                tiltY = e.beta;  // positive = tilt forward
+                statusEl.textContent = `Tilt: ${tiltX.toFixed(1)}, ${tiltY.toFixed(1)}`;
+            }
+        });
+        // If no events after 1s, show keyboard hint
+        setTimeout(() => {
+            if (!hasAccelerometer) {
+                statusEl.textContent = 'No accelerometer detected. Use arrow keys.';
+            }
+        }, 1000);
+    }
+
+    // Keyboard fallback
+    const keys = {};
+    window.addEventListener('keydown', e => { keys[e.key] = true; });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    // Tap to request permission on iOS
+    document.body.addEventListener('click', () => {
+        if (!hasAccelerometer) requestPermission();
+    }, { once: true });
+
+    requestPermission();
+
+    function isWall(gx, gy) {
+        if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) return true;
+        return grid[gy][gx] === 1;
+    }
+
+    function update(dt) {
+        if (won) return;
+
+        // Apply acceleration from tilt or keyboard
+        let ax = 0, ay = 0;
+        if (hasAccelerometer) {
+            ax = tiltX * accelScale;
+            ay = tiltY * accelScale;
+        }
+        if (keys['ArrowLeft'])  ax = -0.015;
+        if (keys['ArrowRight']) ax = 0.015;
+        if (keys['ArrowUp'])    ay = -0.015;
+        if (keys['ArrowDown'])  ay = 0.015;
+
+        ball.vx += ax;
+        ball.vy += ay;
+        ball.vx *= friction;
+        ball.vy *= friction;
+
+        // Move and collide X
+        ball.x += ball.vx;
+        resolveCollision('x');
+
+        // Move and collide Y
+        ball.y += ball.vy;
+        resolveCollision('y');
+
+        // Check goal
+        const gx = Math.floor(ball.x);
+        const gy = Math.floor(ball.y);
+        if (gx >= 0 && gy >= 0 && gx < cols && gy < rows && grid[gy][gx] === 2) {
+            won = true;
+            winEl.style.display = 'flex';
+        }
+    }
+
+    function resolveCollision(axis) {
+        const r = radius;
+        // Check all four corners of the ball's bounding box
+        const left = ball.x - r;
+        const right = ball.x + r;
+        const top = ball.y - r;
+        const bottom = ball.y + r;
+
+        const cells = [
+            [Math.floor(left), Math.floor(top)],
+            [Math.floor(right), Math.floor(top)],
+            [Math.floor(left), Math.floor(bottom)],
+            [Math.floor(right), Math.floor(bottom)],
+        ];
+
+        for (const [cx, cy] of cells) {
+            if (!isWall(cx, cy)) continue;
+
+            // Find closest point on cell to ball center
+            const closestX = Math.max(cx, Math.min(ball.x, cx + 1));
+            const closestY = Math.max(cy, Math.min(ball.y, cy + 1));
+            const dx = ball.x - closestX;
+            const dy = ball.y - closestY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < r) {
+                if (dist === 0) continue;
+                const overlap = r - dist;
+                ball.x += (dx / dist) * overlap;
+                ball.y += (dy / dist) * overlap;
+                if (axis === 'x') ball.vx = 0;
+                if (axis === 'y') ball.vy = 0;
+            }
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                if (grid[y][x] === 1) {
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    // Wall edge highlight
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, 2);
+                    ctx.fillRect(x * cellSize, y * cellSize, 2, cellSize);
+                } else if (grid[y][x] === 2) {
+                    ctx.fillStyle = '#4ade80';
+                    ctx.beginPath();
+                    ctx.arc((x + 0.5) * cellSize, (y + 0.5) * cellSize, cellSize * 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // Draw ball
+        ctx.fillStyle = '#f87171';
+        ctx.beginPath();
+        ctx.arc(ball.x * cellSize, ball.y * cellSize, radius * cellSize, 0, Math.PI * 2);
+        ctx.fill();
+        // Ball shine
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc((ball.x - radius * 0.25) * cellSize, (ball.y - radius * 0.25) * cellSize, radius * cellSize * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function resetGame() {
+        ball = { x: 1.5, y: 1.5, vx: 0, vy: 0 };
+        won = false;
+        winEl.style.display = 'none';
+    }
+
+    let lastTime = performance.now();
+    function loop(time) {
+        const dt = time - lastTime;
+        lastTime = time;
+        update(dt);
+        draw();
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+    </script>
 </body>
 </html>
