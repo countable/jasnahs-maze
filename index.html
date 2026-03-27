@@ -23,36 +23,43 @@
             overflow: hidden;
             touch-action: none;
         }
-        canvas {
-            border: 2px solid #444;
-            border-radius: 4px;
-        }
-        #status {
-            margin-top: 12px;
+        canvas { border: 2px solid #444; border-radius: 4px; }
+        #hud {
+            position: fixed;
+            top: 8px; left: 8px; right: 8px;
+            display: flex;
+            justify-content: space-between;
             font-size: 14px;
-            color: #888;
+            color: #ccc;
+            z-index: 5;
+            pointer-events: none;
         }
-        #win {
+        #status { margin-top: 8px; font-size: 13px; color: #888; }
+        .overlay {
             display: none;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             align-items: center;
             justify-content: center;
             flex-direction: column;
             z-index: 10;
+            color: #e0e0e0;
+            text-align: center;
+            padding: 20px;
         }
-        #win h1 { font-size: 3rem; color: #4ade80; }
-        #win button {
-            margin-top: 20px;
-            padding: 12px 32px;
+        .overlay h1 { font-size: 2.5rem; margin-bottom: 12px; }
+        .overlay p { font-size: 1rem; color: #aaa; margin-bottom: 20px; max-width: 300px; }
+        .overlay button {
+            padding: 14px 36px;
             font-size: 1.2rem;
             border: none;
             border-radius: 8px;
-            background: #4ade80;
-            color: #1a1a2e;
             cursor: pointer;
+            margin: 6px;
         }
+        .btn-green { background: #4ade80; color: #1a1a2e; }
+        .btn-red { background: #f87171; color: #fff; }
         #rotate-msg {
             display: none;
             position: fixed;
@@ -78,64 +85,303 @@
         <div class="icon">📱</div>
         <div>Please rotate your device to portrait mode</div>
     </div>
-    <div id="start-btn" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:20; display:flex; align-items:center; justify-content:center; flex-direction:column;">
-        <h2 style="color:#e0e0e0; margin-bottom:20px;">Accelerometer Maze</h2>
-        <button style="padding:16px 40px; font-size:1.3rem; border:none; border-radius:8px; background:#f87171; color:#fff; cursor:pointer;">Tap to Start</button>
+
+    <div id="start-screen" class="overlay" style="display:flex;">
+        <h1>Maze Runner</h1>
+        <p>Tilt your phone or use arrow keys to guide the ball through increasingly dangerous mazes!</p>
+        <button class="btn-red" id="start-btn">Tap to Start</button>
     </div>
+
+    <div id="level-screen" class="overlay">
+        <h1 id="level-title"></h1>
+        <p id="level-desc"></p>
+        <button class="btn-green" id="level-go-btn">Go!</button>
+    </div>
+
+    <div id="win-screen" class="overlay">
+        <h1 style="color:#4ade80;">Level Complete!</h1>
+        <button class="btn-green" id="next-btn">Next Level</button>
+    </div>
+
+    <div id="death-screen" class="overlay">
+        <h1 style="color:#f87171;" id="death-msg">Ouch!</h1>
+        <button class="btn-red" id="retry-btn">Retry</button>
+    </div>
+
+    <div id="beat-screen" class="overlay">
+        <h1 style="color:#fbbf24;">You Beat All Levels!</h1>
+        <p>Congratulations, maze master!</p>
+        <button class="btn-green" id="restart-btn">Play Again</button>
+    </div>
+
+    <div id="hud">
+        <span id="hud-level"></span>
+        <span id="hud-keys"></span>
+    </div>
+
     <canvas id="maze"></canvas>
     <div id="status">Tilt your phone to move the ball</div>
-    <div id="win">
-        <h1>You Win!</h1>
-        <button onclick="resetGame()">Play Again</button>
-    </div>
 
     <script>
     const canvas = document.getElementById('maze');
     const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
-    const winEl = document.getElementById('win');
 
-    // Maze grid (1 = wall, 0 = path, 2 = goal)
-    const grid = [
-        [1,1,1,1,1,1,1,1,1,1,1],
-        [1,0,0,0,1,0,0,0,0,0,1],
-        [1,0,1,0,1,0,1,1,1,0,1],
-        [1,0,1,0,0,0,0,0,1,0,1],
-        [1,0,1,1,1,1,1,0,1,0,1],
-        [1,0,0,0,0,0,1,0,0,0,1],
-        [1,1,1,0,1,0,1,1,1,0,1],
-        [1,0,0,0,1,0,0,0,0,0,1],
-        [1,0,1,1,1,1,1,1,1,0,1],
-        [1,0,0,0,0,0,0,0,0,2,1],
-        [1,1,1,1,1,1,1,1,1,1,1],
+    // --- TILE TYPES ---
+    // 0=path, 1=wall, 2=goal, 3=trap(spikes), 4=key, 5=door, 6=monster-spawn
+    const TILE = { PATH:0, WALL:1, GOAL:2, TRAP:3, KEY:4, DOOR:5, MONSTER:6 };
+
+    // --- LEVELS ---
+    const levels = [
+        {
+            name: "Level 1: The Basics",
+            desc: "Reach the green goal. Simple!",
+            start: [1.5, 1.5],
+            grid: [
+                [1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,1,0,0,0,0,0,1],
+                [1,0,1,0,1,0,1,1,1,0,1],
+                [1,0,1,0,0,0,0,0,1,0,1],
+                [1,0,1,1,1,1,1,0,1,0,1],
+                [1,0,0,0,0,0,1,0,0,0,1],
+                [1,1,1,0,1,0,1,1,1,0,1],
+                [1,0,0,0,1,0,0,0,0,0,1],
+                [1,0,1,1,1,1,1,1,1,0,1],
+                [1,0,0,0,0,0,0,0,0,2,1],
+                [1,1,1,1,1,1,1,1,1,1,1],
+            ],
+            monsters: []
+        },
+        {
+            name: "Level 2: Watch Your Step",
+            desc: "Red spikes will send you back to the start!",
+            start: [1.5, 1.5],
+            grid: [
+                [1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,3,0,0,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,1,3,0,0,0,3,1,0,1],
+                [1,0,1,0,1,1,1,0,1,0,1],
+                [1,0,0,0,3,0,3,0,0,0,1],
+                [1,1,1,0,1,0,1,0,1,1,1],
+                [1,0,0,0,1,0,1,0,0,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,3,0,0,0,0,0,3,2,1],
+                [1,1,1,1,1,1,1,1,1,1,1],
+            ],
+            monsters: []
+        },
+        {
+            name: "Level 3: Lock & Key",
+            desc: "Find the gold key to open the blue door!",
+            start: [1.5, 1.5],
+            grid: [
+                [1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,1,0,0,0,0,0,1],
+                [1,0,1,0,1,0,1,1,1,0,1],
+                [1,0,1,0,0,0,0,0,1,0,1],
+                [1,0,1,1,1,1,1,0,1,0,1],
+                [1,0,0,0,0,0,1,0,5,0,1],
+                [1,1,1,0,1,3,1,1,1,0,1],
+                [1,4,0,0,1,0,0,3,0,0,1],
+                [1,0,1,1,1,1,1,1,1,0,1],
+                [1,0,0,3,0,0,0,0,0,2,1],
+                [1,1,1,1,1,1,1,1,1,1,1],
+            ],
+            monsters: []
+        },
+        {
+            name: "Level 4: The Guardian",
+            desc: "A monster patrols the maze. Don't let it touch you!",
+            start: [1.5, 1.5],
+            grid: [
+                [1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,1,3,0,0,3,0,1,0,1],
+                [1,0,1,0,1,1,1,0,1,0,1],
+                [1,0,0,0,0,0,0,0,0,0,1],
+                [1,0,1,0,1,1,1,0,1,0,1],
+                [1,0,1,0,0,0,0,0,1,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,0,0,0,2,1],
+                [1,1,1,1,1,1,1,1,1,1,1],
+            ],
+            monsters: [
+                { path: [{x:1,y:5},{x:9,y:5}], speed: 0.02 }
+            ]
+        },
+        {
+            name: "Level 5: Danger Zone",
+            desc: "Keys, doors, traps, AND monsters. Good luck!",
+            start: [1.5, 1.5],
+            grid: [
+                [1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,1,0,3,0,0,0,0,0,1],
+                [1,0,1,0,1,0,1,1,1,0,1,0,1],
+                [1,0,1,0,0,0,0,0,1,0,1,0,1],
+                [1,0,1,1,1,1,1,0,1,0,1,0,1],
+                [1,0,0,0,3,0,1,0,5,0,1,0,1],
+                [1,1,1,0,1,0,1,1,1,0,1,0,1],
+                [1,4,0,0,1,0,0,3,0,0,0,0,1],
+                [1,0,1,1,1,1,1,1,1,1,1,0,1],
+                [1,0,0,3,0,0,0,0,3,0,0,0,1],
+                [1,0,1,1,1,0,1,1,1,1,1,0,1],
+                [1,0,0,0,0,0,0,0,0,0,0,2,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1],
+            ],
+            monsters: [
+                { path: [{x:1,y:9},{x:11,y:9}], speed: 0.025 },
+                { path: [{x:5,y:1},{x:5,y:7}], speed: 0.02 }
+            ]
+        },
+        {
+            name: "Level 6: The Labyrinth",
+            desc: "A sprawling maze. The view follows your ball.",
+            start: [1.5, 1.5],
+            grid: (function() {
+                // 21x21 procedural-feeling maze (hand-designed for fairness)
+                const g = [];
+                const W = 21, H = 21;
+                for (let y = 0; y < H; y++) {
+                    g[y] = [];
+                    for (let x = 0; x < W; x++) {
+                        g[y][x] = (x === 0 || y === 0 || x === W-1 || y === H-1) ? 1 : 0;
+                    }
+                }
+                // Internal walls - create a maze pattern
+                const walls = [
+                    // Horizontal walls
+                    [[2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2]],
+                    [[10,2],[11,2],[12,2],[13,2],[14,2]],
+                    [[16,2],[17,2],[18,2],[19,2]],
+                    [[2,4],[3,4],[4,4]],
+                    [[6,4],[7,4],[8,4],[9,4],[10,4]],
+                    [[12,4],[13,4],[14,4],[15,4],[16,4]],
+                    [[18,4],[19,4]],
+                    [[1,6],[2,6],[3,6],[4,6]],
+                    [[6,6],[7,6],[8,6]],
+                    [[10,6],[11,6],[12,6],[13,6]],
+                    [[15,6],[16,6],[17,6],[18,6],[19,6]],
+                    [[2,8],[3,8],[4,8],[5,8],[6,8]],
+                    [[8,8],[9,8],[10,8]],
+                    [[12,8],[13,8],[14,8],[15,8]],
+                    [[17,8],[18,8],[19,8]],
+                    [[1,10],[2,10],[3,10],[4,10]],
+                    [[6,10],[7,10],[8,10],[9,10],[10,10]],
+                    [[12,10],[13,10]],
+                    [[15,10],[16,10],[17,10],[18,10]],
+                    [[2,12],[3,12],[4,12]],
+                    [[6,12],[7,12],[8,12],[9,12]],
+                    [[11,12],[12,12],[13,12],[14,12],[15,12]],
+                    [[17,12],[18,12],[19,12]],
+                    [[1,14],[2,14],[3,14],[4,14],[5,14]],
+                    [[7,14],[8,14],[9,14],[10,14]],
+                    [[12,14],[13,14],[14,14]],
+                    [[16,14],[17,14],[18,14],[19,14]],
+                    [[2,16],[3,16],[4,16]],
+                    [[6,16],[7,16],[8,16],[9,16],[10,16],[11,16]],
+                    [[13,16],[14,16],[15,16],[16,16]],
+                    [[18,16],[19,16]],
+                    [[1,18],[2,18],[3,18],[4,18],[5,18],[6,18]],
+                    [[8,18],[9,18],[10,18],[11,18],[12,18]],
+                    [[14,18],[15,18],[16,18],[17,18],[18,18]],
+                ];
+                for (const wall of walls) {
+                    for (const [wx, wy] of wall) {
+                        g[wy][wx] = 1;
+                    }
+                }
+                // Place traps
+                const traps = [[3,3],[9,5],[15,7],[5,9],[13,11],[7,13],[17,15],[3,17],[11,17]];
+                for (const [tx, ty] of traps) g[ty][tx] = 3;
+                // Key and door
+                g[7][1] = 4;  // key bottom-left area
+                g[10][14] = 5; // door mid-right
+                // Goal
+                g[19][19] = 2;
+                return g;
+            })(),
+            monsters: [
+                { path: [{x:1,y:5},{x:9,y:5}], speed: 0.02 },
+                { path: [{x:19,y:11},{x:11,y:11}], speed: 0.018 },
+                { path: [{x:5,y:15},{x:5,y:19}], speed: 0.022 },
+            ]
+        },
     ];
 
-    const rows = grid.length;
-    const cols = grid[0].length;
-    let cellSize;
+    // --- GAME STATE ---
+    let currentLevel = 0;
+    let grid, rows, cols, cellSize;
+    let ball, radius = 0.35;
+    let monsters = [];
+    let hasKey = false;
+    let won = false;
+    let dead = false;
+    let gameStarted = false;
 
-    function sizeCanvas() {
-        const maxDim = Math.min(window.innerWidth - 20, window.innerHeight - 80, 500);
-        cellSize = Math.floor(maxDim / cols);
-        canvas.width = cols * cellSize;
-        canvas.height = rows * cellSize;
-    }
-    sizeCanvas();
-    window.addEventListener('resize', () => { sizeCanvas(); draw(); });
+    // Camera for scrolling
+    let camX = 0, camY = 0;
+    let viewCols, viewRows;
 
-    // Ball state
-    let ball = { x: 1.5, y: 1.5, vx: 0, vy: 0 };
-    const radius = 0.35;
-
-    // Physics: tuned so full tilt feels brisk but ball can't skip walls
+    // Physics
     const accelScale = 0.002;
     const friction = 0.95;
-    const maxSpeed = 0.25; // cells per frame — must be < radius to prevent tunneling
+    const maxSpeed = 0.25;
     let tiltX = 0, tiltY = 0;
-    let won = false;
     let hasAccelerometer = false;
 
-    const startBtn = document.getElementById('start-btn');
+    // --- CANVAS SIZING ---
+    function sizeCanvas() {
+        const maxW = window.innerWidth - 10;
+        const maxH = window.innerHeight - 50;
+        // Determine how many cells fit on screen
+        const maxCells = Math.max(cols, rows);
+        const fitSize = Math.floor(Math.min(maxW, maxH) / Math.min(maxCells, 13));
+        cellSize = Math.max(fitSize, 20);
+        viewCols = Math.min(cols, Math.floor(maxW / cellSize));
+        viewRows = Math.min(rows, Math.floor(maxH / cellSize));
+        canvas.width = viewCols * cellSize;
+        canvas.height = viewRows * cellSize;
+    }
+
+    // --- LEVEL LOADING ---
+    function loadLevel(idx) {
+        const lv = levels[idx];
+        // Deep copy grid so we can modify it (pick up keys, open doors)
+        grid = lv.grid.map(r => [...r]);
+        rows = grid.length;
+        cols = grid[0].length;
+        ball = { x: lv.start[0], y: lv.start[1], vx: 0, vy: 0 };
+        hasKey = false;
+        won = false;
+        dead = false;
+
+        // Init monsters
+        monsters = lv.monsters.map(m => ({
+            path: m.path.map(p => ({x: p.x + 0.5, y: p.y + 0.5})),
+            speed: m.speed,
+            t: 0,
+            forward: true,
+        }));
+
+        sizeCanvas();
+        updateHUD();
+    }
+
+    function updateHUD() {
+        const lv = levels[currentLevel];
+        document.getElementById('hud-level').textContent = `Level ${currentLevel + 1}/${levels.length}`;
+        // Show key status if level has keys
+        const hasKeyTile = lv.grid.some(r => r.includes(TILE.KEY));
+        document.getElementById('hud-keys').textContent = hasKeyTile ? (hasKey ? '🔑 Got key!' : '🔑 Find key') : '';
+    }
+
+    // --- INPUT ---
+    const keys = {};
+    window.addEventListener('keydown', e => { keys[e.key] = true; });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
     const needsPermission = typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function';
 
@@ -145,22 +391,15 @@
                 hasAccelerometer = true;
                 tiltX = e.gamma;
                 tiltY = e.beta;
-                statusEl.textContent = `Tilt: ${tiltX.toFixed(1)}, ${tiltY.toFixed(1)}`;
             }
         });
         setTimeout(() => {
             if (!hasAccelerometer) {
-                statusEl.textContent = 'No accelerometer detected. Use arrow keys.';
+                statusEl.textContent = 'No accelerometer. Use arrow keys.';
             }
         }, 1000);
     }
 
-    // Keyboard fallback
-    const keys = {};
-    window.addEventListener('keydown', e => { keys[e.key] = true; });
-    window.addEventListener('keyup', e => { keys[e.key] = false; });
-
-    // Lock to portrait when possible
     function lockOrientation() {
         if (screen.orientation && screen.orientation.lock) {
             screen.orientation.lock('portrait').catch(() => {});
@@ -169,46 +408,99 @@
     lockOrientation();
 
     function goFullscreen() {
-        // On iOS Safari, fullscreen only works on specific elements (canvas, video)
         const el = canvas;
         if (el.requestFullscreen) el.requestFullscreen().then(lockOrientation).catch(() => {});
         else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
         else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     }
 
-    // Always show start button so fullscreen is triggered from a user gesture
-    startBtn.querySelector('button').addEventListener('click', () => {
-        goFullscreen();
+    // --- SCREENS ---
+    function showScreen(id) {
+        for (const s of document.querySelectorAll('.overlay')) s.style.display = 'none';
+        if (id) document.getElementById(id).style.display = 'flex';
+    }
 
+    document.getElementById('start-btn').addEventListener('click', () => {
+        goFullscreen();
         if (needsPermission) {
             DeviceOrientationEvent.requestPermission()
-                .then(response => {
-                    startBtn.style.display = 'none';
-                    if (response === 'granted') {
-                        listenOrientation();
-                    } else {
-                        statusEl.textContent = 'Permission denied. Use arrow keys.';
-                    }
-                })
-                .catch(() => {
-                    startBtn.style.display = 'none';
-                    statusEl.textContent = 'Permission error. Use arrow keys.';
-                });
+                .then(r => { if (r === 'granted') listenOrientation(); })
+                .catch(() => {});
         } else {
-            startBtn.style.display = 'none';
             listenOrientation();
+        }
+        gameStarted = true;
+        currentLevel = 0;
+        showLevelIntro();
+    });
+
+    document.getElementById('level-go-btn').addEventListener('click', () => {
+        showScreen(null);
+        loadLevel(currentLevel);
+    });
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+        currentLevel++;
+        if (currentLevel >= levels.length) {
+            showScreen('beat-screen');
+        } else {
+            showLevelIntro();
         }
     });
 
-    function isWall(gx, gy) {
-        if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) return true;
-        return grid[gy][gx] === 1;
+    document.getElementById('retry-btn').addEventListener('click', () => {
+        showScreen(null);
+        loadLevel(currentLevel);
+    });
+
+    document.getElementById('restart-btn').addEventListener('click', () => {
+        currentLevel = 0;
+        showLevelIntro();
+    });
+
+    function showLevelIntro() {
+        document.getElementById('level-title').textContent = levels[currentLevel].name;
+        document.getElementById('level-desc').textContent = levels[currentLevel].desc;
+        showScreen('level-screen');
     }
 
-    function update(dt) {
-        if (won) return;
+    // --- COLLISION ---
+    function isWall(gx, gy) {
+        if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) return true;
+        return grid[gy][gx] === TILE.WALL || grid[gy][gx] === TILE.DOOR;
+    }
 
-        // Apply acceleration from tilt or keyboard
+    function resolveCollision(axis) {
+        const r = radius;
+        const left = ball.x - r, right = ball.x + r;
+        const top = ball.y - r, bottom = ball.y + r;
+        const cells = [
+            [Math.floor(left), Math.floor(top)],
+            [Math.floor(right), Math.floor(top)],
+            [Math.floor(left), Math.floor(bottom)],
+            [Math.floor(right), Math.floor(bottom)],
+        ];
+        for (const [cx, cy] of cells) {
+            if (!isWall(cx, cy)) continue;
+            const closestX = Math.max(cx, Math.min(ball.x, cx + 1));
+            const closestY = Math.max(cy, Math.min(ball.y, cy + 1));
+            const dx = ball.x - closestX;
+            const dy = ball.y - closestY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < r && dist > 0) {
+                const overlap = r - dist;
+                ball.x += (dx / dist) * overlap;
+                ball.y += (dy / dist) * overlap;
+                if (axis === 'x') ball.vx = 0;
+                if (axis === 'y') ball.vy = 0;
+            }
+        }
+    }
+
+    // --- UPDATE ---
+    function update() {
+        if (won || dead) return;
+
         let ax = 0, ay = 0;
         if (hasAccelerometer) {
             ax = tiltX * accelScale;
@@ -224,14 +516,12 @@
         ball.vx *= friction;
         ball.vy *= friction;
 
-        // Clamp speed so ball can never move more than radius per step
         const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
         if (speed > maxSpeed) {
             ball.vx = (ball.vx / speed) * maxSpeed;
             ball.vy = (ball.vy / speed) * maxSpeed;
         }
 
-        // Sub-step movement to prevent tunneling through walls
         const steps = Math.ceil(Math.max(Math.abs(ball.vx), Math.abs(ball.vy)) / (radius * 0.5)) || 1;
         const svx = ball.vx / steps;
         const svy = ball.vy / steps;
@@ -242,97 +532,169 @@
             resolveCollision('y');
         }
 
-        // Check goal
+        // Check tile interactions
         const gx = Math.floor(ball.x);
         const gy = Math.floor(ball.y);
-        if (gx >= 0 && gy >= 0 && gx < cols && gy < rows && grid[gy][gx] === 2) {
-            won = true;
-            winEl.style.display = 'flex';
+        if (gx >= 0 && gy >= 0 && gx < cols && gy < rows) {
+            const tile = grid[gy][gx];
+            if (tile === TILE.GOAL) {
+                won = true;
+                showScreen('win-screen');
+            } else if (tile === TILE.TRAP) {
+                dead = true;
+                document.getElementById('death-msg').textContent = 'Spiked!';
+                showScreen('death-screen');
+            } else if (tile === TILE.KEY) {
+                hasKey = true;
+                grid[gy][gx] = TILE.PATH;
+                // Open all doors
+                for (let r = 0; r < rows; r++)
+                    for (let c = 0; c < cols; c++)
+                        if (grid[r][c] === TILE.DOOR) grid[r][c] = TILE.PATH;
+                updateHUD();
+            }
         }
-    }
 
-    function resolveCollision(axis) {
-        const r = radius;
-        // Check all four corners of the ball's bounding box
-        const left = ball.x - r;
-        const right = ball.x + r;
-        const top = ball.y - r;
-        const bottom = ball.y + r;
+        // Update monsters
+        for (const m of monsters) {
+            const p0 = m.path[0], p1 = m.path[1];
+            m.t += m.speed * (m.forward ? 1 : -1);
+            if (m.t >= 1) { m.t = 1; m.forward = false; }
+            if (m.t <= 0) { m.t = 0; m.forward = true; }
+            m.x = p0.x + (p1.x - p0.x) * m.t;
+            m.y = p0.y + (p1.y - p0.y) * m.t;
 
-        const cells = [
-            [Math.floor(left), Math.floor(top)],
-            [Math.floor(right), Math.floor(top)],
-            [Math.floor(left), Math.floor(bottom)],
-            [Math.floor(right), Math.floor(bottom)],
-        ];
-
-        for (const [cx, cy] of cells) {
-            if (!isWall(cx, cy)) continue;
-
-            // Find closest point on cell to ball center
-            const closestX = Math.max(cx, Math.min(ball.x, cx + 1));
-            const closestY = Math.max(cy, Math.min(ball.y, cy + 1));
-            const dx = ball.x - closestX;
-            const dy = ball.y - closestY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist < r && dist > 0) {
-                const overlap = r - dist;
-                const nx = dx / dist;
-                const ny = dy / dist;
-                ball.x += nx * overlap;
-                ball.y += ny * overlap;
-                // Zero velocity into the wall
-                if (axis === 'x') ball.vx = 0;
-                if (axis === 'y') ball.vy = 0;
+            // Check collision with ball
+            const dx = ball.x - m.x;
+            const dy = ball.y - m.y;
+            if (Math.sqrt(dx * dx + dy * dy) < radius + 0.35) {
+                dead = true;
+                document.getElementById('death-msg').textContent = 'Caught!';
+                showScreen('death-screen');
             }
         }
     }
 
+    // --- CAMERA ---
+    function updateCamera() {
+        if (cols <= viewCols) {
+            camX = 0;
+        } else {
+            camX = ball.x - viewCols / 2;
+            camX = Math.max(0, Math.min(camX, cols - viewCols));
+        }
+        if (rows <= viewRows) {
+            camY = 0;
+        } else {
+            camY = ball.y - viewRows / 2;
+            camY = Math.max(0, Math.min(camY, rows - viewRows));
+        }
+    }
+
+    // --- DRAW ---
     function draw() {
+        if (!gameStarted) return;
+        updateCamera();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                if (grid[y][x] === 1) {
+        // Background
+        ctx.fillStyle = '#0f0f23';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const startCol = Math.floor(camX);
+        const endCol = Math.min(cols, startCol + viewCols + 2);
+        const startRow = Math.floor(camY);
+        const endRow = Math.min(rows, startRow + viewRows + 2);
+
+        for (let y = startRow; y < endRow; y++) {
+            for (let x = startCol; x < endCol; x++) {
+                const sx = (x - camX) * cellSize;
+                const sy = (y - camY) * cellSize;
+                const tile = grid[y][x];
+
+                if (tile === TILE.WALL) {
                     ctx.fillStyle = '#334155';
-                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-                    // Wall edge highlight
+                    ctx.fillRect(sx, sy, cellSize, cellSize);
                     ctx.fillStyle = '#475569';
-                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, 2);
-                    ctx.fillRect(x * cellSize, y * cellSize, 2, cellSize);
-                } else if (grid[y][x] === 2) {
+                    ctx.fillRect(sx, sy, cellSize, 2);
+                    ctx.fillRect(sx, sy, 2, cellSize);
+                } else if (tile === TILE.GOAL) {
                     ctx.fillStyle = '#4ade80';
                     ctx.beginPath();
-                    ctx.arc((x + 0.5) * cellSize, (y + 0.5) * cellSize, cellSize * 0.3, 0, Math.PI * 2);
+                    ctx.arc(sx + cellSize/2, sy + cellSize/2, cellSize * 0.3, 0, Math.PI * 2);
                     ctx.fill();
+                } else if (tile === TILE.TRAP) {
+                    // Spikes - draw X pattern
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    const m = cellSize * 0.2;
+                    ctx.beginPath();
+                    ctx.moveTo(sx + m, sy + m); ctx.lineTo(sx + cellSize - m, sy + cellSize - m);
+                    ctx.moveTo(sx + cellSize - m, sy + m); ctx.lineTo(sx + m, sy + cellSize - m);
+                    // Add center diamond
+                    ctx.moveTo(sx + cellSize/2, sy + m);
+                    ctx.lineTo(sx + cellSize - m, sy + cellSize/2);
+                    ctx.lineTo(sx + cellSize/2, sy + cellSize - m);
+                    ctx.lineTo(sx + m, sy + cellSize/2);
+                    ctx.closePath();
+                    ctx.stroke();
+                } else if (tile === TILE.KEY) {
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath();
+                    ctx.arc(sx + cellSize/2, sy + cellSize * 0.35, cellSize * 0.18, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillRect(sx + cellSize * 0.42, sy + cellSize * 0.45, cellSize * 0.16, cellSize * 0.4);
+                    ctx.fillRect(sx + cellSize * 0.5, sy + cellSize * 0.65, cellSize * 0.15, cellSize * 0.08);
+                } else if (tile === TILE.DOOR) {
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fillRect(sx + 2, sy + 2, cellSize - 4, cellSize - 4);
+                    ctx.fillStyle = '#60a5fa';
+                    ctx.fillRect(sx + cellSize * 0.6, sy + cellSize * 0.4, cellSize * 0.12, cellSize * 0.12);
                 }
             }
         }
 
+        // Draw monsters
+        for (const m of monsters) {
+            const sx = (m.x - camX) * cellSize;
+            const sy = (m.y - camY) * cellSize;
+            const mr = cellSize * 0.4;
+            // Body
+            ctx.fillStyle = '#a855f7';
+            ctx.beginPath();
+            ctx.arc(sx, sy, mr, 0, Math.PI * 2);
+            ctx.fill();
+            // Eyes
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(sx - mr * 0.3, sy - mr * 0.15, mr * 0.22, 0, Math.PI * 2);
+            ctx.arc(sx + mr * 0.3, sy - mr * 0.15, mr * 0.22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#1a1a2e';
+            ctx.beginPath();
+            ctx.arc(sx - mr * 0.25, sy - mr * 0.1, mr * 0.1, 0, Math.PI * 2);
+            ctx.arc(sx + mr * 0.35, sy - mr * 0.1, mr * 0.1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         // Draw ball
+        const bsx = (ball.x - camX) * cellSize;
+        const bsy = (ball.y - camY) * cellSize;
         ctx.fillStyle = '#f87171';
         ctx.beginPath();
-        ctx.arc(ball.x * cellSize, ball.y * cellSize, radius * cellSize, 0, Math.PI * 2);
+        ctx.arc(bsx, bsy, radius * cellSize, 0, Math.PI * 2);
         ctx.fill();
-        // Ball shine
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
         ctx.beginPath();
-        ctx.arc((ball.x - radius * 0.25) * cellSize, (ball.y - radius * 0.25) * cellSize, radius * cellSize * 0.4, 0, Math.PI * 2);
+        ctx.arc(bsx - radius * 0.25 * cellSize, bsy - radius * 0.25 * cellSize, radius * cellSize * 0.4, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    function resetGame() {
-        ball = { x: 1.5, y: 1.5, vx: 0, vy: 0 };
-        won = false;
-        winEl.style.display = 'none';
-    }
+    // --- GAME LOOP ---
+    window.addEventListener('resize', () => { if (gameStarted) { sizeCanvas(); draw(); } });
 
-    let lastTime = performance.now();
-    function loop(time) {
-        const dt = time - lastTime;
-        lastTime = time;
-        update(dt);
+    function loop() {
+        update();
         draw();
         requestAnimationFrame(loop);
     }
