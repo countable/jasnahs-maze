@@ -450,10 +450,11 @@
     lockOrientation();
 
     function goFullscreen() {
-        const el = canvas;
-        if (el.requestFullscreen) el.requestFullscreen().then(lockOrientation).catch(() => {});
+        // Fullscreen API is not needed/supported in standalone PWA mode
+        if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) return;
+        const el = document.documentElement;
+        if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
         else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-        else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     }
 
     // --- SCREENS ---
@@ -463,17 +464,17 @@
     }
 
     document.getElementById('start-btn').addEventListener('click', () => {
+        gameStarted = true;
+        currentLevel = 0;
+        showLevelIntro();
         goFullscreen();
         if (needsPermission) {
             DeviceOrientationEvent.requestPermission()
                 .then(r => { if (r === 'granted') listenOrientation(); })
-                .catch(() => {});
+                .catch(() => { listenOrientation(); });
         } else {
             listenOrientation();
         }
-        gameStarted = true;
-        currentLevel = 0;
-        showLevelIntro();
     });
 
     document.getElementById('level-go-btn').addEventListener('click', () => {
