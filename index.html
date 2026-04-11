@@ -779,7 +779,6 @@
 
     // --- INSTALL TIP (iOS Safari only, not already standalone) ---
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = window.navigator.standalone === true;
     if (isIos && !isStandalone && !localStorage.getItem('installDismissed')) {
         document.getElementById('install-tip').style.display = 'block';
     }
