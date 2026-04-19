@@ -113,6 +113,10 @@
             For fullscreen mode: tap <strong>Share</strong> <span style="font-size:1.2em;">⬆</span> then <strong>Add to Home Screen</strong>
             <br><button onclick="this.parentElement.style.display='none'; localStorage.setItem('installDismissed','1');" style="margin-top:8px; padding:4px 16px; border:none; border-radius:4px; background:#475569; color:#e0e0e0; font-size:0.85rem; cursor:pointer;">Got it</button>
         </div>
+        <div id="orient-tip" style="display:none; background:#334155; border-radius:8px; padding:12px 16px; margin-bottom:16px; font-size:0.9rem; max-width:300px; text-align:center; line-height:1.5;">
+            To lock portrait mode on iPhone: swipe down from top-right and tap <strong>🔒 Orientation Lock</strong>
+            <br><button onclick="this.parentElement.style.display='none'; localStorage.setItem('orientDismissed','1');" style="margin-top:8px; padding:4px 16px; border:none; border-radius:4px; background:#475569; color:#e0e0e0; font-size:0.85rem; cursor:pointer;">Got it</button>
+        </div>
         <button class="btn-red" id="start-btn">Tap to Start</button>
         <button class="btn-update" id="update-btn">Check for Updates</button>
     </div>
@@ -372,8 +376,8 @@
                 [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
             ],
             monsters: [
-                { path: [{x:1,y:1},{x:13,y:1}], speed: 0.008 },
-                { path: [{x:13,y:13},{x:1,y:13}], speed: 0.008 },
+                { path: [{x:5,y:2},{x:13,y:2}], speed: 0.008 },
+                { path: [{x:13,y:12},{x:1,y:12}], speed: 0.008 },
                 { path: [{x:1,y:7},{x:5,y:7}], speed: 0.01 },
                 { path: [{x:9,y:7},{x:13,y:7}], speed: 0.01 },
             ]
@@ -525,6 +529,38 @@
                 { path: [{x:25,y:25},{x:25,y:29}], speed: 0.006 },
             ]
         },
+        {
+            name: "Level 10: The Big Cheese",
+            desc: "The walls are made of cheese. Find the exit, little mouse!",
+            start: [1.5, 1.5],
+            theme: 'cheese',
+            grid: [
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+                [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+                [1,0,1,0,1,0,1,1,1,0,1,0,1,0,1],
+                [1,0,1,0,0,0,7,0,1,0,0,0,1,0,1],
+                [1,0,1,1,1,1,1,0,1,1,1,0,1,0,1],
+                [1,0,0,0,3,0,0,0,0,0,1,0,0,0,1],
+                [1,1,1,0,1,0,1,1,1,0,1,1,1,0,1],
+                [1,4,0,0,1,0,0,3,0,0,0,0,0,0,1],
+                [1,0,1,1,1,1,1,1,1,0,1,1,1,1,1],
+                [1,0,0,0,1,0,0,0,0,0,1,0,0,0,1],
+                [1,0,1,0,1,0,1,0,1,1,1,0,1,0,1],
+                [1,0,1,0,0,0,1,0,0,0,5,0,1,0,1],
+                [1,0,1,1,1,0,1,1,1,0,1,0,1,8,1],
+                [1,0,0,0,0,0,0,3,0,0,1,0,0,0,1],
+                [1,1,1,0,1,1,1,1,1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,1,0,0,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1,0,1,1,1,1,1,0,1],
+                [1,0,0,3,0,0,0,0,0,0,0,0,0,2,1],
+                [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            ],
+            monsters: [
+                { path: [{x:1,y:5},{x:8,y:5}], speed: 0.008 },
+                { path: [{x:13,y:9},{x:13,y:17}], speed: 0.007 },
+                { path: [{x:3,y:15},{x:8,y:15}], speed: 0.009 },
+            ]
+        },
     ];
 
     // --- GAME STATE ---
@@ -536,6 +572,7 @@
     let won = false;
     let dead = false;
     let gameStarted = false;
+    let currentTheme = null;
 
     // Camera for scrolling
     let camX = 0, camY = 0;
@@ -574,6 +611,7 @@
         won = false;
         dead = false;
         radius = baseRadius;
+        currentTheme = lv.theme || null;
 
         // Init monsters
         monsters = lv.monsters.map(m => ({
@@ -823,7 +861,7 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Background
-        ctx.fillStyle = '#0f0f23';
+        ctx.fillStyle = currentTheme === 'cheese' ? '#4a3b1a' : '#0f0f23';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         const startCol = Math.floor(camX);
@@ -838,11 +876,32 @@
                 const tile = grid[y][x];
 
                 if (tile === TILE.WALL) {
-                    ctx.fillStyle = '#334155';
-                    ctx.fillRect(sx, sy, cellSize, cellSize);
-                    ctx.fillStyle = '#475569';
-                    ctx.fillRect(sx, sy, cellSize, 2);
-                    ctx.fillRect(sx, sy, 2, cellSize);
+                    if (currentTheme === 'cheese') {
+                        ctx.fillStyle = '#f5c542';
+                        ctx.fillRect(sx, sy, cellSize, cellSize);
+                        ctx.fillStyle = '#e0a800';
+                        ctx.fillRect(sx, sy, cellSize, 2);
+                        ctx.fillRect(sx, sy, 2, cellSize);
+                        // Cheese holes
+                        const seed = (x * 7 + y * 13) % 5;
+                        ctx.fillStyle = '#c88a00';
+                        if (seed < 3) {
+                            ctx.beginPath();
+                            ctx.arc(sx + cellSize * (0.3 + seed * 0.15), sy + cellSize * (0.35 + seed * 0.1), cellSize * 0.12, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        if (seed > 1) {
+                            ctx.beginPath();
+                            ctx.arc(sx + cellSize * 0.7, sy + cellSize * 0.65, cellSize * 0.08, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    } else {
+                        ctx.fillStyle = '#334155';
+                        ctx.fillRect(sx, sy, cellSize, cellSize);
+                        ctx.fillStyle = '#475569';
+                        ctx.fillRect(sx, sy, cellSize, 2);
+                        ctx.fillRect(sx, sy, 2, cellSize);
+                    }
                 } else if (tile === TILE.GOAL) {
                     ctx.fillStyle = '#4ade80';
                     ctx.beginPath();
@@ -920,17 +979,48 @@
             ctx.fill();
         }
 
-        // Draw ball
+        // Draw ball / mouse
         const bsx = (ball.x - camX) * cellSize;
         const bsy = (ball.y - camY) * cellSize;
-        ctx.fillStyle = '#f87171';
-        ctx.beginPath();
-        ctx.arc(bsx, bsy, radius * cellSize, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.beginPath();
-        ctx.arc(bsx - radius * 0.25 * cellSize, bsy - radius * 0.25 * cellSize, radius * cellSize * 0.4, 0, Math.PI * 2);
-        ctx.fill();
+        const br = radius * cellSize;
+        if (currentTheme === 'cheese') {
+            // Mouse body
+            ctx.fillStyle = '#9ca3af';
+            ctx.beginPath();
+            ctx.arc(bsx, bsy, br, 0, Math.PI * 2);
+            ctx.fill();
+            // Ears
+            ctx.fillStyle = '#d1d5db';
+            ctx.beginPath();
+            ctx.arc(bsx - br * 0.55, bsy - br * 0.55, br * 0.35, 0, Math.PI * 2);
+            ctx.arc(bsx + br * 0.55, bsy - br * 0.55, br * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#f9a8d4';
+            ctx.beginPath();
+            ctx.arc(bsx - br * 0.55, bsy - br * 0.55, br * 0.2, 0, Math.PI * 2);
+            ctx.arc(bsx + br * 0.55, bsy - br * 0.55, br * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            // Eyes
+            ctx.fillStyle = '#1a1a2e';
+            ctx.beginPath();
+            ctx.arc(bsx - br * 0.25, bsy - br * 0.1, br * 0.12, 0, Math.PI * 2);
+            ctx.arc(bsx + br * 0.25, bsy - br * 0.1, br * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+            // Nose
+            ctx.fillStyle = '#f9a8d4';
+            ctx.beginPath();
+            ctx.arc(bsx, bsy + br * 0.2, br * 0.1, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#f87171';
+            ctx.beginPath();
+            ctx.arc(bsx, bsy, br, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.beginPath();
+            ctx.arc(bsx - br * 0.25, bsy - br * 0.25, br * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     // --- GAME LOOP ---
@@ -977,10 +1067,13 @@
         e.stopPropagation();
     });
 
-    // --- INSTALL TIP (iOS Safari only, not already standalone) ---
+    // --- iOS TIPS ---
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (isIos && !isStandalone && !localStorage.getItem('installDismissed')) {
         document.getElementById('install-tip').style.display = 'block';
+    }
+    if (isIos && !localStorage.getItem('orientDismissed')) {
+        document.getElementById('orient-tip').style.display = 'block';
     }
 
     // --- UPDATE BUTTON ---
